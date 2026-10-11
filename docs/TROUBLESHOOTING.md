@@ -1,5 +1,6 @@
 # 排错：保留原请求，按错误类别核验
 
+> v0.4 分层说明：本文件描述保留的兼容 CLI / 控制面。完整原工作台见 [模块地图](MODULE_MAP.md) 与 [原生接入](WORKBENCH_SETUP.md)；源码只读查看不等于业务已接通。
 先保留 `error.code`、`unknown`、原 operation ID / key 和步骤。`unknown=true` 表示可能已执行，不表示“没有执行”；不要删 state、换 key 重发或切提供方绕过。问题报告只贴脱敏错误类别与版本，不贴配置、Token、完整 auth / 账号 JSON、原稿或媒体。
 
 ## 环境、身份和权限

@@ -29,13 +29,13 @@ IGNORED_DIRECTORIES = frozenset({
 MAX_SOURCE_BYTES = 10 * 1024 * 1024
 PUBLIC_FEISHU_HOSTS = frozenset({
     "open", "www", "docs", "help", "support", "developer", "developers",
-    "applink", "passport", "accounts", "static",
+    "applink", "passport", "accounts", "static", "login",
 })
 HOME_PATH = re.compile(r"/" + r"Users/([^/\s\"'<>`]+)(?:/|\b)|[A-Za-z]:[\\/]+Users[\\/]+([^\\/\s\"'<>`]+)")
 FEISHU_ID = re.compile(r"(?<![A-Za-z0-9_])(?:ou_|oc_|om_|cli_)[A-Za-z0-9]{12,}(?![A-Za-z0-9_])|(?<![A-Za-z0-9_])(?:rec|tbl|fld)[A-Za-z0-9]{12,}(?![A-Za-z0-9_])")
 TENANT_HOST = re.compile(r"\b([A-Za-z0-9][A-Za-z0-9-]*)\.(?:feishu\.cn|larksuite\.com|larkoffice\.com)\b", re.I)
 PRIVATE_KEY = re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----")
-API_SECRET = re.compile(r"(?<![A-Za-z0-9])(?:sk-(?:proj-)?[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{24,}|xox[baprs]-[A-Za-z0-9-]{18,}|AIza[A-Za-z0-9_-]{30,})(?![A-Za-z0-9])")
+API_SECRET = re.compile(r"(?<![A-Za-z0-9])(?:sk-(?:proj-)?[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|AKID[A-Za-z0-9]{16,}|gh[pousr]_[A-Za-z0-9]{24,}|xox[baprs]-[A-Za-z0-9-]{18,}|AIza[A-Za-z0-9_-]{30,})(?![A-Za-z0-9])")
 BEARER_SECRET = re.compile(r"\bBearer\s+([A-Za-z0-9._~+/=\-]{24,})", re.I)
 CREDENTIAL_ASSIGNMENT = re.compile(
     r"\b(?:[A-Za-z][A-Za-z0-9_]*_)?(?:api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|app[_-]?secret|password|passwd)"
@@ -60,11 +60,20 @@ def allowed_path(value: str) -> bool:
         return False
     if len(parts) == 1:
         return value in TOP_LEVEL
+    if parts[0] == "workbench":
+        return (path.suffix in {".py", ".cjs", ".mjs", ".js", ".json", ".html", ".css", ".svg", ".md"}
+                or path.name == "LICENSE" or path.name.endswith(".LICENSE"))
+    if parts[0] == ".github":
+        return value == ".github/pull_request_template.md"
+    if parts[0] == "agent-runtime":
+        return value == "agent-runtime/workflow-registry.json"
     if parts[0] == "contentbase":
         return path.suffix == ".py" or (
             len(parts) == 3 and parts[1] == "web" and path.suffix in {".html", ".js", ".css"}
         )
-    if parts[0] in {"docs", "tests", "scripts"} and len(parts) == 2:
+    if parts[0] == "docs":
+        return path.suffix == ".md"
+    if parts[0] in {"tests", "scripts"} and len(parts) == 2:
         return path.suffix == (".md" if parts[0] == "docs" else ".py")
     return value == "skills/content-company-base/SKILL.md"
 
@@ -126,6 +135,10 @@ def _placeholder(value: str, kind: str = "generic") -> bool:
     if re.fullmatch(r"(?:\$\{[A-Z_][A-Z0-9_]*\}|<[A-Z_][A-Z0-9_]*>|\{\{\s*[A-Z_][A-Z0-9_]*\s*\}\})", upper):
         return True
     if kind == "identifier":
+        # Exact public ECharts renderer class, not a Feishu record identifier.
+        # Keep upstream bytes intact; this does not exempt arbitrary rec* values.
+        if value == "rectCoordBuildBreakAxis":
+            return True
         return bool(re.fullmatch(r"(?:ou_|oc_|om_|cli_|rec|tbl|fld)example[A-Za-z0-9_-]*", lower))
     return False
 
@@ -176,7 +189,7 @@ def _finding(relative: str, line: int, rule: str, values: list[str]) -> dict[str
 def _candidate_files(root: Path) -> tuple[set[str], list[str]]:
     files = {name for name in TOP_LEVEL if (root / name).exists() or (root / name).is_symlink()}
     links: list[str] = []
-    for prefix in ("contentbase", "docs", "tests", "scripts", "skills/content-company-base"):
+    for prefix in ("contentbase", "docs", "tests", "scripts", "skills/content-company-base", "workbench", ".github", "agent-runtime"):
         directory = root / prefix
         if directory.is_symlink():
             links.append(prefix)

@@ -1,76 +1,89 @@
-# Content Company Base
+# Content Company Base · 内容公司工作台
 
-**给 Agent 使用的内容一人公司底座：飞书保存业务事实，蚁小二负责真实发布，本机工作台负责计划、人工确认和执行证据。**
+**原工作台的脱敏源码 + 内容流程控制面；真实飞书、真实蚁小二，配置和业务数据由使用者自己提供。**
 
-它不是模型、聊天产品或另一个 Agent 框架。你继续使用自己的 Agent，让它通过 CLI / HTTP API 读取内容事项、提交草稿、准备发布和提交复盘；底座把结果关联回你自己的飞书记录。
+## v0.4 与旧版的区别
 
-## 先用三步理解
+v0.3.3 是另行实现的精简 Web 内容控制面，和原工作台不是同一产品。v0.4 将原工作台的前端、原生 IPC、内容/账号/对话/制作/数据/活动/网关源码迁入 `workbench/`，保留原页面结构；不是仅给旧页面换样式。原 `contentbase` CLI 与技术队列继续保留，作为独立兼容控制面。
 
-1. **业务在哪里？** 在你自己的飞书 Base / 表。这里没有另一套公司业务数据库，也不复制别人的账号、表格或授权。
-2. **谁做内容？** 你已有的 Agent。项目不内置模型、不索取模型 Key；Agent 交付文本和文件，底座保存带摘要的执行计划。
-3. **谁决定发布？** 你本人。蚁小二上传、校验与 dry-run 后，必须查看冻结预览并明确确认才正式投递。任务受理和作品公开分别验收。
+| 入口 | 用途 | 身份与外部动作 |
+|---|---|---|
+| `python3 -m contentbase workbench` | 无配置查看原工作台布局、模块源码入口 | **只读源码查看模式**：无本人身份/业务记录，无模型/飞书/上传/发布 |
+| `npm --prefix workbench start` | 原生桌面工作台、本人登录、隔离官方页面与业务模块 | 需要自己的配置/网关/CLI/授权，逐层真实验收 |
+| `python3 -m contentbase ... serve` | 已配置的内容控制面；根页为原工作台只读查看 | `/control` 是旧 CLI 兼容界面，令牌在源码外 state |
+| `python3 workbench/backend/server.py --config PRIVATE_CONFIG` | 原工作台认证网关及网页适配 | 本人资源准备完成后显式启动；源码不会自动安装服务 |
 
-```text
-你的 Agent ── CLI / API ── 本机工作台
-                             ├─ lark-cli → 你的飞书内容表（业务权威）
-                             └─ yxer     → 你的蚁小二账号 → 发布平台
-                         私有技术 state：计划 / 摘要 / 幂等 / 回执
-```
+“原实现源码已迁移”“能看到布局”“本人账号配置完成”“真实业务完成”是四种状态，见 [迁移验收](docs/WORKBENCH_MIGRATION.md)。原 GLB、账号、组织 ID、业务 MD、Cookie、Token、素材与运行历史均排除；保留结构与协议，不带原公司的业务事实。
 
-## 首版能做什么
+## 先看工作台
 
-- 真实 `lark-cli` 接入：每次核验 user 身份，显式 Profile，读取指定 Base / 表；写前读、dry-run、本人批准、执行和写后回读。
-- 草稿编辑另取完整原记录并绑定 source fingerprint；源变化保留稿件，须本人核对最新原文后重新建立计划。公开登记、复盘同样先生成受审写计划。
-- 真实 `yxer` 接入：单账号图文 / 视频，平台 schema 与动态音乐 / 分区，完整上传回执，固定 `cloud` 或 `local` 通道的 validate + dry-run。
-- 准备时复制并摘要冻结实际素材；网页按原顺序验证字节并显示图片 / 视频 / 独立封面，或导出完整本机审核包。本人完整观看并明确确认后才投递，重复请求幂等、未知不重发。
-- 本机 Web 工作台与 CLI 共用业务守护；外部 Agent 无需迁移到我们的聊天界面。
-
-**首版边界：** 单用户本机；无自动建表、内置 AI、自动采集、定时无人发布、财务、多人权限或 OS 执行沙箱。支持 CLI / API 的 Agent 可以接入，不等于每个聊天产品天然具备执行能力。
-
-## 快速开始
-
-首版运行环境为 macOS / Linux（Windows 支持待补）。需要 Python 3.11+、你自行安装的 `lark-cli` / `yxer`、自己的已授权飞书 Profile / 内容表和蚁小二账号。运行代码只有 Python 标准库；可直接从源码启动，无需先安装 Python 包。Python 支持状态以 [官方版本维护表](https://devguide.python.org/versions/) 为准；本项目最低运行版本为 3.11，不把已结束维护的版本列为生产推荐。
-
-- `lark-cli`：按 [飞书官方 CLI 源码与安装说明](https://github.com/larksuite/cli) 获取和安装，使用你本人已有的授权 Profile。
-- `yxer`：向蚁小二供应商获取其本人安装 / 配置指引；本项目不猜测 npm 包名、不提供陌生下载镜像。
-- 拉取本项目源码只获得本项目代码，不附赠飞书、蚁小二或发布平台的服务授权、账号、额度或凭据。
+Python 3.11+ 即可运行只读查看，不需要飞书/蚁小二授权：
 
 ```bash
 cd content-company-base
-export CONFIG="$HOME/.config/content-company-base/config.json"
-python3 -m contentbase --config "$CONFIG" init-config
-# 编辑刚生成的配置：填写你自己的 Profile、Base token、table ID 和字段映射。
-python3 -m contentbase --config "$CONFIG" doctor
-python3 -m contentbase --config "$CONFIG" sync
-python3 -m contentbase --config "$CONFIG" serve --port 8787
+python3 -B -m contentbase workbench --port 8787
 ```
 
-打开 `http://127.0.0.1:8787`。访问 Token 在有效 state 目录的 `web-access.json`（0600）；由本人在本机读取并输入工作台，启动输出不会打印 Token。配置不填写密码、OAuth Token 或 API Key；供应商凭据继续由供应商 CLI 保管。默认技术目录为 `~/.local/state/content-company-base`，可用 `CONTENTBASE_STATE_DIR` 指定源码之外的独立目录。一个 state 首次真实核验后固定本人身份；另一位使用者必须准备自己的配置 / state 与供应商授权，不清旧数据库或借用旧授权。
+打开 `http://127.0.0.1:8787`。页面使用原工作台代码及本地资源，显示明确的源码查看标识。此模式没有假账号或预填业务记录，也不会因点击触发供应商命令。发布/数据等需要真实资源的部分显示源码和规范入口；不是已经接通业务的演示。
 
-> `sync` 读取真实飞书；“准备发布”会向蚁小二上传素材。第一次演练前先看 [快速上手](docs/QUICKSTART.md) 和 [发布流程](docs/PUBLISHING.md)，不要把它们当离线操作。
+## 真实原生工作台
+
+Node 22.12+，从自己的源码安装原项目依赖：
+
+```bash
+npm --prefix workbench install
+export CONTENTBASE_WORKBENCH_STATE="$HOME/.local/share/content-company-workbench"
+node workbench/scripts/init-config.cjs --state "$CONTENTBASE_WORKBENCH_STATE"
+# 按 docs/WORKBENCH_SETUP.md 填本人 Profile / 表 / 目录 / 网关，不填供应商密钥。
+export CONTENTBASE_LARK_PROFILE='YOUR_PROFILE'
+npm --prefix workbench start
+```
+
+`init-config` 只生成私有槽位，不登录、复制授权或建业务记录；已有文件保持原样。真实运行须替换 YOUR_ 项并启动自己配置的网关。缺资源时显示未配置/待授权，页面加载不表示已登录。个人模型文件可以在源码外配置；源码不附原人物 GLB。
+
+## 给接手的 Agent
+
+**不要遍历整个公司资料或把全部规范塞进 Prompt。**按层读：
+
+1. [AGENTS.md](AGENTS.md)：全局边界。
+2. [模块地图](docs/MODULE_MAP.md)：快速定位源代码、规范、状态。
+3. 所在目录的 AGENTS 与对应模块全文。
+4. 代码入口、调用方、协议及相关测试。
+5. 需要动态事实时，再查本人明确绑定的飞书原对象。
+
+```bash
+python3 -B scripts/module_docs.py --list
+python3 -B scripts/module_docs.py content
+python3 -B scripts/module_docs.py publishing
+python3 -B scripts/module_docs.py route:daily-task-checkin
+```
+
+机器索引：[`workbench/module-registry.json`](workbench/module-registry.json)，含 12 个原工作台模块、22 个原工作流合同；逐项区分 `ported_original_source` 与 `contract_only`。规范存在不表示后台工作流已经安装；规则与接口变化必须同步索引、模块书、调用方及测试。
 
 ## 文档地图
 
-| 你想做什么 | 先读 |
+| 主题 | 文件 |
 |---|---|
-| 已有授权资源时快速理解并启动 | [快速上手](docs/QUICKSTART.md) |
-| 绑定自己的飞书表 | [飞书接入](docs/FEISHU_SETUP.md) |
-| 图文 / 视频正式发布 | [蚁小二发布](docs/PUBLISHING.md) |
-| 让现有 Agent 接入 | [Agent 协议](docs/AGENT_PROTOCOL.md)、[项目 Skill](skills/content-company-base/SKILL.md) |
-| 接手开发、审查或提交 Pull Request | [PR Agent 交接](docs/PR_AGENT_HANDOFF.md) |
-| 理解技术边界、修改代码 | [架构](docs/ARCHITECTURE.md)、[开发规则](AGENTS.md) |
-| 判断什么可以公开 | [隐私与开源边界](docs/PRIVACY.md) |
-| 区分已实现与真实待验收 | [当前状态](docs/STATUS.md) |
-| 遇到错误，判断本人下一步 | [排错手册](docs/TROUBLESHOOTING.md) |
+| 原工作台结构与迁移边界 | [迁移验收](docs/WORKBENCH_MIGRATION.md) |
+| 本人资源与启动步骤 | [原生工作台接入](docs/WORKBENCH_SETUP.md) |
+| 所有模块 / 后台工作流规范 | [模块地图](docs/MODULE_MAP.md) |
+| Agent 快速读取业务 MD / 规则 | [知识导航](docs/KNOWLEDGE_NAVIGATION.md) |
+| 任务、原表及飞书 CLI | [飞书接入](docs/FEISHU_SETUP.md)、[任务模块](docs/modules/tasks.md) |
+| 确认、冻结、回执与发布 | [发布流程](docs/PUBLISHING.md)、[发布模块](docs/modules/publishing.md) |
+| CLI / HTTP 兼容接口 | [Agent 协议](docs/AGENT_PROTOCOL.md) |
+| 审查与贡献 | [PR Agent 交接](docs/PR_AGENT_HANDOFF.md)、[测试分层](docs/TESTING.md) |
+| 隐私与源码发布 | [公开边界](docs/PRIVACY.md)、[第三方许可](docs/THIRD_PARTY.md) |
 
-## 验证与真实验收
+## 原有 CLI 闭环继续保留
 
-本地自动测试使用显式合成数据与替身 CLI；它们验证守护逻辑，不代表你的账号授权或平台发布已成功。
+飞书是业务权威；Agent 产稿，程序计划，人审批；蚁小二实际执行。真实业务按层验收：本人身份→原表读取→受审写计划→写后回读→素材上传与预检→本人确认投递→原任务查询→本人打开作品→飞书登记与复盘。
 
 ```bash
-python3 -m unittest discover -s tests -v
+python3 -B -m unittest discover -s tests -v
+python3 -B scripts/check_workbench.py
+python3 -B scripts/privacy_audit.py --root .
 ```
 
-真实验收按层记录：CLI 环境 → 本人身份 → 飞书读写与回读 → 素材上传及 validate / dry-run → 本人确认投递 → 查询平台回执 → 本人打开公开作品 → 显式回写飞书 → 复盘回读。开源开发及测试本身不授权正式发作品；未完成的层级仍是待验收。
+详情见 [旧 CLI 快速上手](docs/QUICKSTART.md)。一次选定一个发布入口；原生工作台和兼容控制面的批准、队列、幂等键不互认。同作品不要同时经两种队列投递。
 
-MIT 许可覆盖本项目代码；飞书、蚁小二与平台服务的许可、账号权限、费用和使用规则由相应供应商决定。本项目不附带它们的服务、账号、凭据或私有软件。
+MIT 覆盖本项目代码；供应商服务/平台账号、套餐、授权及使用规则由使用者与供应商决定。第三方前端资源原许可随代码保留。

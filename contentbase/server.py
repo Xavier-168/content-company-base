@@ -44,6 +44,8 @@ def error_value(error):
 def make_server(service, port=8787, token=None):
     token = token or secrets.token_urlsafe(32)
     public = Path(__file__).parent / "web"
+    workbench = Path(__file__).resolve().parents[1] / "workbench"
+    inspect_page = workbench / "web" / "inspection.html"
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -90,6 +92,42 @@ def make_server(service, port=8787, token=None):
             try:
                 self.guard()
                 path = urlparse(self.path).path
+                # The source distribution opens the original workbench, explicitly
+                # read-only. The wheel keeps its compatibility controller; the full
+                # Electron workbench is distributed as source, not a Python wheel.
+                if path == "/" and inspect_page.is_file():
+                    import re as html_re
+                    from scripts.privacy_audit import read_source
+                    raw = read_source(workbench.parent, "workbench/web/inspection.html").decode("utf-8")
+                    raw = html_re.sub(r'(src|href)="(?!https?:|/|#)([^\"]+)"',
+                                      lambda match: match[1] + '="/workbench/web/' + match[2] + '"', raw)
+                    raw = raw.encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'none'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+                    self.send_header("Content-Length", str(len(raw)))
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers(); self.wfile.write(raw); return
+                if path.startswith("/workbench/") or path.startswith("/vendor/"):
+                    if not inspect_page.is_file():
+                        raise BaseError("invalid_static_asset")
+                    from scripts.privacy_audit import PrivacyError, manifest_files, read_source
+                    relative = path.lstrip("/") if path.startswith("/workbench/") else "workbench/web/" + path.lstrip("/")
+                    root = Path(__file__).resolve().parents[1]
+                    allowed = relative.startswith("workbench/web/") and relative in manifest_files(root)
+                    if not allowed or Path(relative).suffix not in {".js", ".css", ".svg", ".html"}:
+                        raise BaseError("invalid_static_asset")
+                    try: raw = read_source(root, relative)
+                    except PrivacyError: raise BaseError("invalid_static_asset") from None
+                    import mimetypes
+                    self.send_response(200)
+                    self.send_header("Content-Type", mimetypes.guess_type(relative)[0] or "application/octet-stream")
+                    self.send_header("Content-Length", str(len(raw)))
+                    self.send_header("X-Content-Type-Options", "nosniff")
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers(); self.wfile.write(raw); return
+                if path == "/control":
+                    path = "/"
                 if path in ("/", "/app.js", "/style.css"):
                     name = {"/": "index.html", "/app.js": "app.js", "/style.css": "style.css"}[path]
                     raw = (public / name).read_bytes()

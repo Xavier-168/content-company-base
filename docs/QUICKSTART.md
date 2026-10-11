@@ -1,5 +1,6 @@
 # 快速上手
 
+> v0.4 分层说明：本文件描述保留的兼容 CLI / 控制面。完整原工作台见 [模块地图](MODULE_MAP.md) 与 [原生接入](WORKBENCH_SETUP.md)；源码只读查看不等于业务已接通。
 目标是先读到**你的飞书记录**，再完成一条受审闭环；不复制其他人的运行环境。启动时间以供应商 CLI、本人授权 / 套餐与表权限已经到位为前提；首次注册、审批或供应商配置时间不包含在本机启动步骤内。
 
 ## 1. 你需要准备什么
@@ -32,7 +33,7 @@ python3 -m contentbase --config "$CONFIG" sync
 python3 -m contentbase --config "$CONFIG" serve --port 8787
 ```
 
-打开 `http://127.0.0.1:8787`。访问 Token 保存在有效 state 目录的 `web-access.json`（0600），默认是 `~/.local/state/content-company-base/web-access.json`；由本人在本机读取文件的 `token` 并输入网页，终端启动输出不会打印它。不要把 Token 放在 URL、截图或问题报告中。首次看到表格只表示读取成功，不表示写权限和发布权限全部通过。
+兼容控制面打开 `http://127.0.0.1:8787/control`。访问 Token 保存在有效 state 目录的 `web-access.json`（0600），默认是 `~/.local/state/content-company-base/web-access.json`；由本人在本机读取文件的 `token` 并输入网页，终端启动输出不会打印它。不要把 Token 放在 URL、截图或问题报告中。首次看到表格只表示读取成功，不表示写权限和发布权限全部通过。
 
 变更配置前先私有保存旧完整 config（0600、源码及 state 外），保留原 state / operation ID / key。新配置 scope 空列表不表示未执行；按 [原配置快照只读恢复](TROUBLESHOOTING.md#变更配置前保留原完整快照) 核验。
 

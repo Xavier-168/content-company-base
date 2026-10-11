@@ -78,6 +78,8 @@ def parser():
     inspection.add_argument("operation_id", nargs="?")
     server = sub.add_parser("serve", help="只监听127.0.0.1的本人工作台")
     server.add_argument("--port", type=int, default=8787)
+    viewer = sub.add_parser("workbench", help="原工作台源码只读查看；无身份、无业务数据、不执行外部动作")
+    viewer.add_argument("--port", type=int, default=8787)
     return p
 
 
@@ -87,6 +89,17 @@ def main(argv=None):
         raise SystemExit(2)
     args = parser().parse_args(argv)
     try:
+        if args.command == "workbench":
+            if not (Path(__file__).resolve().parents[1] / "workbench/web/inspection.html").is_file():
+                raise BaseError("workbench_source_checkout_required")
+            from .server import make_server
+            server, _ = make_server(None, args.port)
+            emit({"ok": True, "data": {"url": "http://127.0.0.1:%d" % server.server_port,
+                  "mode": "source_inspection", "authenticated": False, "business_enabled": False}})
+            try: server.serve_forever()
+            except KeyboardInterrupt: pass
+            finally: server.server_close()
+            return
         if args.command == "init-config":
             path = Path(args.config or state_home() / "config.json").expanduser()
             if path.exists():

@@ -5,6 +5,11 @@ recursive-include contentbase *.py
 include contentbase/web/*.html contentbase/web/*.js contentbase/web/*.css
 include docs/*.md scripts/*.py tests/*.py
 include skills/content-company-base/SKILL.md
+recursive-include docs *.md
+recursive-include workbench *.py *.cjs *.mjs *.js *.json *.html *.css *.svg *.md LICENSE *.LICENSE
+include .github/pull_request_template.md
+include agent-runtime/workflow-registry.json
+prune workbench/node_modules
 prune .git
 prune .hg
 prune .svn
